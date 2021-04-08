@@ -6,7 +6,7 @@
 /*   By: awery <marvin@42.fr>                       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2021/03/03 11:29:02 by awery             #+#    #+#             */
-/*   Updated: 2021/03/30 15:40:57 by aurelien         ###   ########.fr       */
+/*   Updated: 2021/04/07 16:06:26 by aurelien         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -69,6 +69,10 @@ typedef struct	s_utils
 	int		savefdout;
 	int		return_value;
 	char				**line_p;
+	char				*line_EOF;
+	int					column_count;
+	int					redir;
+	char				*path;
 }		t_utils;
 
 typedef struct	s_sig
@@ -87,6 +91,7 @@ extern t_sig g_sig;
 # define TEST printf("ON VA LA\n")
 
 
+void	refresh_screen(char **print, char *prefix, t_utils *utils, int histo);
 void		ft_print_prefix(int	activate, char ***env, t_utils *utils);
 int				shelline_gestion(char ***env, t_utils *utils, char **line);
 void			put_histo_in_file(t_utils *utils);
@@ -113,7 +118,7 @@ int			ft_echo(t_parsing info, char ***env, t_utils *utils);
 size_t		ft_doubletab_len(char **doubletab);
 int			is_separator(char *str);
 int			write_with_separator(t_parsing info, char **env, t_utils *utils, int fd);
-int			ft_display_rep(char **env, t_utils utils);
+char		*ft_display_rep(char **env, t_utils utils);
 int			ft_cd(t_parsing info, char ***env, t_utils *utils);
 int			ft_pwd(t_parsing info, char ***env, t_utils *utils);
 int			env_in_env(char **env, char *str);

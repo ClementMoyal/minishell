@@ -4,12 +4,21 @@ void	ft_print_prefix(int	activate, char ***env, t_utils *utils)
 {
 	static char		***env_stat;
 	static t_utils	*utils_stat;
+	char	*prefix;
+	char	*tmp;
 
 	if (activate)
 	{
 		ft_putstr_fd("\n", 1);
-		ft_display_rep(*env_stat, *utils_stat);
-		ft_putstr_fd("-> ", 1);
+		prefix = ft_display_rep(*env_stat, *utils_stat);
+		tmp = prefix;
+		prefix = ft_strjoin(prefix, "-> ");
+		free(tmp);
+		tmp = ft_strdup("");
+		refresh_screen(NULL, NULL, NULL, 0);
+		refresh_screen(&tmp, prefix, utils_stat, 0);
+		free(tmp);
+		free(prefix);
 	}
 	else
 	{
@@ -269,9 +278,10 @@ int reset_fd_one(t_utils *utils)
 {
 	if (utils->savefd != -1)
 	{
-		close(1);
-		dup2(utils->savefd, 1);
+		close(utils->redir);
+		dup2(utils->savefd, utils->redir);
 		utils->savefd = -1;
+		utils->redir = 1;
 		return (1);
 	}
 	return (0);

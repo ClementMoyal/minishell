@@ -6,7 +6,8 @@
 /*   By: awery <marvin@42.fr>                       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2021/03/03 11:25:08 by awery             #+#    #+#             */
-/*   Updated: 2021/03/30 15:48:11 by aurelien         ###   ########.fr       */
+/*   Updated: 2021/04/07 16:36:43 by aurelien         ###   ########.fr       */
+
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -65,12 +66,18 @@ int		no_escape(char **line, int i)
   return (0);
 }
 
-char	**selec_dest(t_parsing *parsing, char quote)
+char	**selec_dest(t_parsing *parsing, char quote, char **line, int *p, t_utils *utils)
 {
   int		i;
   char	**tmp;
 
   i = 0;
+  if ((line[0][*p] == '1' || line[0][*p] == '2' || line[0][*p] == '0') && line[0][*p + 1] == '>')
+  {
+    utils->redir = line[0][*p] - 48;
+    *p = *p + 1;
+    return (NULL);
+  }
   if (parsing->objet == NULL)
   {
     parsing->objet = ft_strdup("");
@@ -114,11 +121,11 @@ void	ft_cpy(char **res, char c)
   free(tmp);
 }
 
-int		get_objet(char **line, int i, t_parsing *parsing)
+int		get_objet(char **line, int i, t_parsing *parsing, t_utils *utils)
 {
   char		**res;
   static char	quote;
- 
+
   if (line[0][i])
   {
     if (is_separator_parsing(line[0], i))
@@ -134,10 +141,9 @@ int		get_objet(char **line, int i, t_parsing *parsing)
 	parsing->separator[0] = line[0][i++];
       return (i);
     }
-    res = selec_dest(parsing, quote);
+    res = selec_dest(parsing, quote, line, &i, utils);
   }
-  while ((line[0][i] != ' ' || (line[0][i] == ' ' && quote != 0) ) &&
-      line[0][i])
+  while (((line[0][i] != ' ' || (line[0][i] == ' ' && quote != 0) || (line[0][i] == ' ' && line[0][i - 1] == 92)) && line[0][i]))
   {
     if (quote != 0)
     {
@@ -159,7 +165,7 @@ int		get_objet(char **line, int i, t_parsing *parsing)
       }
       else
 	parsing->separator[0] = line[0][i++];
-      if (*res != NULL && res[0][0] == 0)
+      if (res != NULL && *res != NULL && res[0][0] == 0)
       {
 	free(*res);
 	*res = NULL;
@@ -181,15 +187,12 @@ int		get_objet(char **line, int i, t_parsing *parsing)
     }
     i++;
   }
-  if (*res != NULL && res[0][0] == 0)
+  if (res != NULL && *res != NULL && res[0][0] == 0)
   {
     free(*res);
     *res = NULL;
   }
-  if (quote == 39)
-    return (OPEN_SQUOTE);
-  if (quote == 34)
-    return (OPEN_DQUOTE);
+  quote = 0;
   return (i);
 }
 
@@ -205,7 +208,7 @@ t_parsing   *ft_last_pars(t_parsing *parsing)
 t_parsing   *new_list(t_parsing *previous_lst)
 {
   t_parsing	*parsing;
-  
+
   previous_lst = ft_last_pars(previous_lst);
   parsing = malloc(sizeof(t_parsing));
   parsing->separator[0] = 0;
@@ -226,27 +229,27 @@ char	**recopy_data(char **data, char **temp, int freed)
   i = 0;
   while (temp[i] != NULL)
   {
-	if (freed == 0)
-		data[i] = ft_strdup(temp[i]);
-	else
-		data[i] = temp[i];
+    if (freed == 0)
+      data[i] = ft_strdup(temp[i]);
+    else
+      data[i] = temp[i];
     i++;
   }
   data[i] = NULL;
   return (data);
 }
 
-int		recursive_parsing(char **line, t_parsing *parsing, int i)
+int		recursive_parsing(char **line, t_parsing *parsing, int i, t_utils *utils)
 {
   while (line[0][i] == ' ')
     i++;
   if (!line[0][i])
     return (i);
-  i = get_objet(line, i, parsing);
+  i = get_objet(line, i, parsing, utils);
   if (parsing->separator[0] != 0)
-    i = recursive_parsing(line, new_list(parsing), i);
+    i = recursive_parsing(line, new_list(parsing), i, utils);
   else if (i >= 0 && line[0][i])
-    i = recursive_parsing(line, parsing, i);
+    i = recursive_parsing(line, parsing, i, utils);
   return (i);
 }
 
@@ -324,22 +327,65 @@ int	ft_signal()
   return (1);
 }
 
-void	refresh_screen(char **print, int *print_char)
+void	refresh_screen(char **print, char *prefix,
+    t_utils *utils, int histo)
 {
-  int	    i;
+  static int	    i;
+  static int	    p;
+  static int	    line_old_len;
 
-  i = 0;
-  if (*print_char > 0)
+  if (print == NULL && prefix == NULL)
   {
-    while (i++ < *print_char)
-      ft_putchar_fd('\b', 0);
-    while (i-- > 0)
-      ft_putchar_fd(' ', 0);
-    while (i++ < *print_char)
-      ft_putchar_fd('\b', 0);
+    i = 0;
+    p = 0;
+    line_old_len = 0;
+    return;
   }
-  ft_putstr_fd(*print, 0);
-  *print_char = ft_strlen(*print);
+  if (histo)
+  {
+    while (p)
+    {
+      write(1, "\b", 1);
+      write(1, " ", 1);
+      write(1, "\b", 1);
+      p--;
+    }
+    i = 0;
+  }
+  else if ((int)ft_strlen(*print) < line_old_len && p)
+  {
+    write(1, "\b", 1);
+    write(1, " ", 1);
+    write(1, "\b", 1);
+    line_old_len = ft_strlen(*print);
+    i = line_old_len;
+    if (p > 0)
+      p--;
+    return ;
+  }
+  if (p == 0 && i == 0)
+    while (*prefix)
+    {
+      ft_putchar_fd(*prefix, 1);
+      prefix++;
+      p++;
+      if (p == utils->column_count)
+      {
+	ft_putchar_fd(10, 1);
+	p = 0;
+      }
+    }
+  while (print[0][i])
+  {
+    ft_putchar_fd(print[0][i++], 1);
+    p++;
+    if (p == utils->column_count)
+    {
+      ft_putchar_fd(10, 1);
+      p = 0;
+    }
+  }
+  line_old_len = ft_strlen(*print);
 }
 
 int	free_ret(void *to_free)
@@ -360,6 +406,8 @@ char	    *ft_up_histo(t_utils *utils, char **line)
     else
       return (*line);
   }
+  else if (line[0][0] == 0)
+    ;
   else
   {
     if (utils->position->previous != NULL)
@@ -368,9 +416,11 @@ char	    *ft_up_histo(t_utils *utils, char **line)
       return (*line);
   }
   line_ret = ft_strdup(utils->position->command);
-  if (ft_strncmp(*line, line_ret, ft_strlen(*line) - 1) == 0)
+  if (ft_strncmp(*line, line_ret, ft_strlen(*line) - 1) == 0 &&
+      ft_strlen(*line) == ft_strlen(line_ret))
   {
     tmp =  ft_strdup(*line);
+    free(line_ret);
     line_ret = ft_up_histo(utils, &tmp);
   }
   free(*line);
@@ -395,21 +445,23 @@ char	    *ft_down_histo(t_utils *utils, char **line)
     }
   }
   line_ret = ft_strdup(utils->position->command);
-  if (ft_strncmp(*line, line_ret, ft_strlen(*line) - 1) == 0)
+  if (ft_strncmp(*line, line_ret, ft_strlen(*line) - 1) == 0 &&
+      ft_strlen(*line) == ft_strlen(line_ret))
   {
     tmp =  ft_strdup(*line);
+    free(line_ret);
     line_ret = ft_down_histo(utils, &tmp);
   }
   free(*line);
   return (line_ret);
 }
 
-int	    ft_recup_line(char **line, t_utils *utils)
+int	    ft_recup_line(char **line, t_utils *utils,
+    char *prefix)
 {
   char		buf[4];
   int		ret;
   int		i;
-  static int	print_char;
 
   i = 0;
   buf[3] = 0;
@@ -423,45 +475,49 @@ int	    ft_recup_line(char **line, t_utils *utils)
     {
       free(*line);
       *line = ft_strdup("");
-      print_char = 0;
       g_sig.prefix = 1;
     }
     if (buf[0] == 27 && buf[1] == 91 && buf[2] == 65)
     {
       *line = ft_up_histo(utils, line);
-      refresh_screen(line, &print_char);
+      utils->line_EOF = *line;
+      refresh_screen(line, prefix, utils, 1);
     }
     else if (buf[0] == 27 && buf[1] == 91 && buf[2] == 66)
     {
       *line = ft_down_histo(utils, line);
-      refresh_screen(line, &print_char);
+      utils->line_EOF = *line;
+      refresh_screen(line, prefix, utils, 1);
     }
     else if (buf[0] == 10)
     {
+      utils->line_EOF = NULL;
       if (**line != 0)
 	new_hlist(*line, utils);
-      refresh_screen(line, &print_char);
+      refresh_screen(NULL, NULL, NULL, 0);
       write(0, "\n", 1);
-      print_char = 0;
       utils->position = NULL;
       return (0);
     }
     else if (ft_isprint(buf[0]))
     {
+      utils->line_EOF = NULL;
       ft_cpy(line, buf[0]);    
-      refresh_screen(line, &print_char);
+      refresh_screen(line, prefix, utils, 0);
     }
     else if (buf[0] == 127)
     {
       if (ft_strlen(*line) > 0)
 	line[0][ft_strlen(*line) - 1] = 0;
-      refresh_screen(line, &print_char);
+      refresh_screen(line, prefix, utils, 0);
     }
     else if (buf[0] == 4)
     {
+      utils->line_EOF = NULL;
       if (**line == 0)
 	return (-1);
     }
+    utils->line_EOF = NULL;
     if (ret == 0)
       return (-1);
     return (1);
@@ -472,16 +528,24 @@ int	    ft_recup_line(char **line, t_utils *utils)
 int		shelline_gestion(char ***env, t_utils *utils, char **line)
 {
   int	ret;
+  char	*prefix;
+  char	*tmp;
 
+  prefix = ft_strdup(""); 
   if (g_sig.prefix == 0 || g_sig.prefix == -1)
   {
-    ft_display_rep(*env, *utils);
-    write(0, "-> ", 3);
+    free(prefix);
+    prefix = ft_display_rep(*env, *utils);
+    tmp = prefix;
+    prefix = ft_strjoin(prefix, "-> ");
+    free(tmp);
     *line = ft_strdup("");
     g_sig.prefix = 1;
+    refresh_screen(line, prefix, utils, 0);
   }
-  while ((ret = ft_recup_line(line, utils)) > 0)
-      ;
+  while ((ret = ft_recup_line(line, utils, prefix)) > 0)
+    ;
+  free(prefix);
   g_sig.prefix = 0;
   if (ret == 0)
     return (1);
@@ -509,6 +573,7 @@ int	term_init(t_utils *utils)
 
     if (tcsetattr(0, 0, &utils->s_termios) == -1)
       return (-1);
+    utils->column_count = tgetnum("co");
   }
   //  if (term_type != NULL)
   //  free(term_type);
@@ -518,18 +583,31 @@ int	term_init(t_utils *utils)
 void	get_quote(char **line, int quote, t_utils *utils)
 {
   int	ret;
+  char	*prefix;
+  int	print_char;
 
+  print_char = 0;
   free(*line);
   *line = ft_strdup("");
   if (quote == OPEN_DQUOTE)
-    write(1, "dquote> ", 8);
+  {
+    prefix = ft_strdup("dquote> ");
+    refresh_screen(line, prefix, utils, 0);
+    while ((ret = ft_recup_line(line, utils, prefix)))
+      ;
+  }
   else
-    write(1, "quote> ", 8);
-  while ((ret = ft_recup_line(line, utils)))
-    ;
+  {
+    prefix = ft_strdup("quote> ");
+    refresh_screen(line, prefix, utils, 0);
+    while ((ret = ft_recup_line(line, utils, prefix)))
+      ;
+  }
+  free(prefix);
   if (ret == -1)
     ft_error("unexpected EOF while looking for matching", "\'\"\'");
 }
+
 
 void	get_open_quote(int *i, char **line, t_parsing *parsing, t_utils *utils)
 {
@@ -540,7 +618,7 @@ void	get_open_quote(int *i, char **line, t_parsing *parsing, t_utils *utils)
   *line = ft_strjoin("\n", *line);
   *i = 0;
   free(tmp);
-  *i = recursive_parsing(line, ft_lstlast(parsing), *i);
+  *i = recursive_parsing(line, ft_lstlast(parsing), *i, utils);
 }
 
 t_historical	*add_next_command(t_historical *previous, char *line)
@@ -610,7 +688,11 @@ void		get_command_file(t_utils *utils)
   int	fd;
   char	*line;
 
-  fd = open(".p_command.hst", O_RDWR | O_CREAT, 0644 | O_DIRECTORY);
+  if ((fd = open(utils->path, O_RDWR | O_CREAT, 0644 | O_DIRECTORY)) == -1)
+  {
+    ft_error(strerror(errno), NULL);
+    exit(1);
+  }
   utils->history_len = 0;
   utils->position = NULL;
   utils->com_history = NULL;
@@ -625,11 +707,56 @@ void		get_command_file(t_utils *utils)
   close(fd);
 }
 
+void		get_p_file_path(t_utils *utils)
+{
+  int	i;
+  char	*path;
+  char	*tmp;
+  int	p;
+
+  p = -1;
+  i = 0;
+  path = getenv("_");
+  if (ft_strncmp(path, "/usr/bin/valgrind", 16) == 0)
+    utils->path = ft_strdup(".p_command.hst");
+  else
+  {
+    utils->path = ft_strdup(path);
+    if (ft_strncmp(path, "//.", 2) == 0)
+    {
+      free(utils->path);
+      utils->path = ft_strdup(&path[3]);
+      while (utils->path[i])
+      {
+	if (ft_strncmp(&utils->path[i], "minishell", 8) == 0)
+	  p = i;
+	i++;
+      }
+    }
+    else
+      while (utils->path[i] != '.')
+      {
+	i++;
+	p = i;
+      }
+    if (p == -1)
+    {
+      printf("problem with the directory name, has to be \"minishell\" \n");
+      exit(1);
+    }
+    utils->path[p] = 0;
+    tmp = utils->path;
+    utils->path = ft_strjoin_gnl(utils->path, ".p_command.hst");
+    free(tmp);
+  }
+}
+
 void		init_utils(t_utils *utils, t_parsing *parsing, char **env)
 {
   utils->pwd = find_in_env(env, "PWD");
   utils->oldpwd = find_in_env(env, "OLDPWD");
   utils->parsing_start = parsing;
+  get_p_file_path(utils);
   get_command_file(utils);
   g_sig.pid = -1;
   utils->fdin[0] = 0;
@@ -640,6 +767,8 @@ void		init_utils(t_utils *utils, t_parsing *parsing, char **env)
   utils->savefdout = -1;
   utils->return_value = 0;
   g_sig.prefix = 0;
+  utils->redir = 1;
+  utils->line_EOF = NULL;
 }
 
 void		write_down_cfile(t_utils *utils, int fd)
@@ -654,7 +783,7 @@ void		write_down_cfile(t_utils *utils, int fd)
     while (histo->next != NULL)
     {
       histo = histo->next; 
-      if (histo->command != NULL)
+      if (histo->command != NULL && histo->command[0] != 0)
       {
 	ft_putstr_fd(histo->command, fd);
 	ft_putchar_fd(10, fd);
@@ -667,10 +796,37 @@ void		put_histo_in_file(t_utils *utils)
 {
   int	fd;
 
-  fd = open(".p_command.hst", O_RDWR | O_CREAT, 0644 | O_DIRECTORY);
+  if ((fd = open(utils->path, O_RDWR | O_CREAT, 0644 | O_DIRECTORY)) == -1)
+  {
+    ft_error(strerror(errno), NULL);
+    exit(1);
+  }
   if (utils->com_history_start->command != NULL)
     write_down_cfile(utils, fd);
   close(fd);
+}
+
+void	ft_start_by_pipe(char ***env, t_utils *utils, char *line, t_parsing *parsing)
+{
+  int i;
+
+  i = 0;
+  if (isatty(0) == 1)
+    return ;
+  while (get_next_line(0, &line))
+  {
+    i = recursive_parsing(&line, parsing, i, utils);
+    while (i == OPEN_SQUOTE || i == OPEN_DQUOTE)
+      get_open_quote(&i, &line, ft_last_pars(parsing), utils);
+    if (!ft_sep(*parsing))
+      fonction_router(parsing, env, utils);
+    parsing = new_list(parsing);
+    i = 0;
+    free(line);
+    line = NULL;
+    g_sig.pid = -1;
+  }
+  ft_exit(env, utils, 0);
 }
 
 int		main(int argc, char **argv, char **env)
@@ -680,6 +836,12 @@ int		main(int argc, char **argv, char **env)
   int				i;
   static t_utils	utils;
 
+
+  if (*env == NULL)
+  {
+    ft_putstr_fd("ERROR, no env\n", 1);
+    exit(1);
+  }
   ft_signal();
   parsing = new_list(NULL);
   init_utils(&utils, parsing, env);
@@ -693,11 +855,12 @@ int		main(int argc, char **argv, char **env)
   line = NULL;
   g_sig.pid = -1;
   ft_print_prefix(0, &env, &utils);
+  ft_start_by_pipe(&env, &utils, line, parsing);
   if (term_init(&utils))
   {
     while (shelline_gestion(&env, &utils, &line) > 0)
     {
-      i = recursive_parsing(&line, parsing, i);
+      i = recursive_parsing(&line, parsing, i, &utils);
       while (i == OPEN_SQUOTE || i == OPEN_DQUOTE)
 	get_open_quote(&i, &line, ft_last_pars(parsing), &utils);
       if (!ft_sep(*parsing))

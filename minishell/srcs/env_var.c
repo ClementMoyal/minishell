@@ -6,7 +6,7 @@
 /*   By: awery <marvin@42.fr>                       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2021/03/05 11:54:22 by awery             #+#    #+#             */
-/*   Updated: 2021/03/30 16:58:50 by aurelien         ###   ########.fr       */
+/*   Updated: 2021/04/07 15:21:54 by aurelien         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,12 +32,12 @@ int		env_in_env(char **env, char *str)
 
 	len = 0;
 	i = 0;
-	while (str[len] != '=' && str[i])
+	while (str[len] && str[len] != '=')
 		len++;
 	i = 0;
 	while (env[i] != NULL)
 	{
-		if (ft_strncmp(env[i], str, len - 1) == 0 && env[i][len] == '=')
+		if (ft_strncmp(env[i], str, len) == 0 && env[i][len] == '=')
 		{
 			free(env[i]);
 			env[i] = ft_strdup(str);
@@ -109,18 +109,21 @@ void	double_tab_sort(char **tabl)
 	}
 }
 
-void	display_env_sort(char **env, int fd)
+void	display_env_sort(char ***env, int fd)
 {
 	int		i;
 
-	double_tab_sort(env);
+	double_tab_sort(*env);
 	i = 0;
-	while (env[i] != NULL)
+	while (env[0][i] != NULL)
 	{
-		ft_putstr_fd(env[i], fd);
+		ft_putstr_fd(env[0][i], fd);
+		free(env[0][i]);
 		write(fd, "\n", 1);
 		i++;
 	}
+	free(env[0][i]);
+	free(*env);
 }
 
 void	recopy_less_data(char ***data, char **temp, char *str)
@@ -231,16 +234,16 @@ int		ft_export(t_parsing *parsing, char ***env, t_utils *utils)
 		while (parsing->data[i] != NULL)
 		{
 			while (parsing->data[i][o] && parsing->data[i][o] != '=')
-				if (!ft_isalnum(parsing->data[i][o++]))
+			{
+				if (!ft_isalnum(parsing->data[i][o]) && parsing->data[i][o] != '_')
 				{
-					error_ret = malloc(o + 1);
-					ft_strlcpy(parsing->data[i], error_ret, o);
-					ft_error("export: not valid in this context", error_ret);
-					free(error_ret);
+					ft_error("export: not valid in this context", parsing->data[i]);
 					return (1);
 				}
-			if (i == 0 && parsing->data[i][0] >= '0' &&
-					parsing->data[i][0] <= '9')
+				o++;
+			}
+			if ((i == 0 && parsing->data[i][0] >= '0' &&
+				parsing->data[i][0] <= '9') || parsing->data[i][0] == '=')
 			{
 				error_ret = malloc(2);
 				error_ret[0] = parsing->data[i][0];
@@ -257,7 +260,9 @@ int		ft_export(t_parsing *parsing, char ***env, t_utils *utils)
 	}
 	else
 	{
-		display_env_sort(*env, fd);
+		utils->tmp = malloc(sizeof(char*) * (ft_doubletab_len(*env) + 1));
+		recopy_data(utils->tmp, *env, 0);
+		display_env_sort(&utils->tmp, fd);
 		return (0);
 	}
 	return (0);
