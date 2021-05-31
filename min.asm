@@ -4,6 +4,7 @@ min:
 		load_b 0		;
 		load_c_adrb 		;
 		load_a 0		;
+		load_b_c		;
 		jmp start		;
 
 start:
