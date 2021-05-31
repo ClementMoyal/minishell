@@ -16,7 +16,11 @@ start:
 loop:
 		load_c_adrb		;
 		cmp_c_a			;
-		jmppz loop		;
+		jmppz isntmin		;
 		load_a_c		;
+		dec_b			;
+		jmpnz loop		;
+
+isntmin:
 		dec_b			;
 		jmpnz loop		;
