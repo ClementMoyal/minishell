@@ -24,3 +24,6 @@ loop:
 isntmin:
 		dec_b			;
 		jmpnz loop		;
+		jmp exit		;
+exit:
+	nop
